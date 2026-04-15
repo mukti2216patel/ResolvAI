@@ -1,0 +1,64 @@
+services:
+  # PostgreSQL database
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: helpdesk
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Express backend (dev mode with hot reload)
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    volumes:
+      # Mount source code for hot reload, but keep node_modules from the container
+      - .:/app
+      - /app/node_modules
+      - /app/client/node_modules
+      - /app/core/node_modules
+    env_file: .env
+    environment:
+      # Override DATABASE_URL to point at the db service instead of localhost
+      DATABASE_URL: postgresql://postgres:postgres@db:5432/helpdesk?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Vite frontend (dev mode with HMR)
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/client/node_modules
+      - /app/core/node_modules
+    environment:
+      # Proxy /api calls to the server service
+      VITE_API_PROXY_TARGET: http://server:4000
+      VITE_DEV_PORT: "5173"
+    command: bun run dev:client -- --host
+    depends_on:
+      - server
+
+volumes:
+  pgdata:

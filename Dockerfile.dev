@@ -1,0 +1,26 @@
+# Lightweight dev image — source code is bind-mounted, not copied
+FROM oven/bun:1.2-alpine
+
+# Install native dependencies needed by Prisma / pg
+RUN apk add --no-cache openssl
+
+WORKDIR /app
+
+# Copy only manifests first for cached dependency install
+COPY package.json bun.lock ./
+COPY client/package.json ./client/
+COPY core/package.json ./core/
+
+RUN bun install --frozen-lockfile
+
+# Copy everything else (will be shadowed by bind mount in compose)
+COPY . .
+
+# Generate Prisma client
+RUN bun x prisma generate
+
+EXPOSE 4000
+
+# Default command — runs the backend with hot reload
+# The client service overrides this in docker-compose.yml
+CMD ["sh", "-c", "bun x prisma migrate deploy && bun run db:seed && bun run dev"]
