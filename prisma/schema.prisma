@@ -1,0 +1,145 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/lib/prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  admin
+  agent
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          UserRole  @default(agent)
+  banned        Boolean   @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+  accounts      Account[]
+  sessions      Session[]
+  tickets       Ticket[]
+  assignedTickets Ticket[]  @relation("AssignedTickets")
+  ticketReplies TicketReply[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String   @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  scope                 String?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value       String
+  createdAt  DateTime
+  updatedAt  DateTime
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+enum TicketStatus {
+  new
+  processing
+  open
+  in_progress
+  resolved
+  closed
+}
+
+enum TicketPriority {
+  low
+  medium
+  high
+  critical
+}
+
+enum TicketCategory {
+  general_question
+  technical_question
+  refund_request
+  none
+}
+
+model Ticket {
+  id            String         @id @default(uuid())
+  ticketNumber  Int            @unique @default(autoincrement())
+  title         String
+  description   String
+  status        TicketStatus   @default(new)
+  priority      TicketPriority @default(medium)
+  category      TicketCategory @default(general_question)
+  customerEmail String?
+  userId        String?
+  user          User?          @relation(fields: [userId], references: [id])
+  assignedToId  String?
+  assignedTo    User?          @relation("AssignedTickets", fields: [assignedToId], references: [id])
+  isAiResolved  Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  replies       TicketReply[]
+
+  @@map("ticket")
+}
+
+enum ReplySenderType {
+  agent
+  customer
+}
+
+model TicketReply {
+  id            String          @id @default(uuid())
+  content       String
+  bodyHtml      String?
+  senderType    ReplySenderType @default(agent)
+  ticketId      String
+  ticket        Ticket          @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?           @relation(fields: [userId], references: [id])
+  customerEmail String?
+  customerName  String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@map("ticket_reply")
+}
