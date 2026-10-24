@@ -1,8 +1,12 @@
+# Production deploy. See DEPLOY.md.
+# One service: Dockerfile builds the client, then CMD migrates, seeds, and starts Express.
+
 [build]
 builder = "dockerfile"
 dockerfilePath = "Dockerfile"
 
 [deploy]
+# Server listens only after migrate + seed, so allow time before the first probe.
 healthcheckPath = "/api/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
